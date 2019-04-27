@@ -1,1 +1,1 @@
-
+name = "example_pkg"
