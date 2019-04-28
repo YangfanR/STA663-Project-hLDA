@@ -7,7 +7,7 @@ Jiayi Ding, Yangfan Ren, Chudi Zhong
 1. Download from https://github.com/renyangfan960902/STA663-Project-hLDA.git.
 2. Install by running: python setup.py install. 
 3. Import hierarchical_lda_ncrp.
-### Optional:
+##### Optional:
 1. %%bash
    pip install --index-url https://test.pypi.org/simple/ hierarchical_lda_ncrp
 2. Import hierarchical_lda_ncrp.
