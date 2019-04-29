@@ -102,52 +102,50 @@ def word_likelihood(corpus, topic, eta):
 
 def gibbs_sampling(corpus, T , alpha, beta, gamma, eta, ite):
     
-    num_vocab = 0
-    for i in range(len(corpus)):
-        num_vocab += len(corpus[i])
+    num_vocab = np.sum([len(x) for x in corpus])
     gibbs = np.zeros((num_vocab, ite))
     
-    it = 0
-    while it < ite:
+    
+    for it in range(ite):
         doc_topic= Z(corpus, T, alpha, beta)[0]
         doc_p = CRP_prior(corpus, doc_topic, gamma)
         lik = word_likelihood(corpus, doc_topic, eta)
         c_m = (lik * doc_p) / (lik * doc_p).sum(axis = 1).reshape(-1,1) #posterior
         
         g=[]
-        for i, doc in enumerate(corpus):
+        for i in range(len(corpus)):
             if np.sum(c_m[i,:-1])>1:
-                c_m[i,-1]=0
                 c_m[i,:-1]=c_m[i,:-1]/np.sum(c_m[i,:-1])
-            for word in doc:
-                k=np.random.multinomial(1, c_m[i]).argmax()     
-                g.append(k)
+                c_m[i,-1]=0
+            for word in corpus[i]:
+                p = np.random.multinomial(1, c_m[i])
+                g.append(p.argmax())
         
         gibbs[:,it]=g
-        it += 1 
     
     t=[]
     for i in range(num_vocab):
-        t.append(int(Counter(gibbs[i]).most_common(1)[0][0]))
+        tt = int(Counter(gibbs[i,:]).most_common(1)[0][0])
+        t.append(tt)
+        
     n_topic=np.max(t)+1
-    
-    w_topic = [[] for n in range(n_topic)]
-    w_doc = [[] for n in range(n_topic)]
 
-    d = 0
+    wn_topic = [[] for _ in range(n_topic)]
+    
     n = 0
-    for i, doc in enumerate(corpus):
-        if d == i:
-            for word in doc:
-                w_doc[t[n]].append(word)
-                n += 1
-            for j in range(n_topic):
-                if w_doc[j] != []:
-                    w_topic[j].append(w_doc[j])
-        w_doc = [[] for n in range(n_topic)]        
-        d += 1
-    w_topic = [x for x in w_topic if x != []]
-    return w_topic
+    for doc in corpus:
+        wn_doc_topic = [[] for _ in range(n_topic)]
+        for word in doc:
+            k = t[n]
+            wn_doc_topic[k].append(word)
+            n += 1
+        for i in range(n_topic):
+            if len(wn_doc_topic[i]) != 0:
+                k = wn_doc_topic[i]
+                wn_topic[i].append(k)
+
+    wn_topic = [x for x in wn_topic if x != []]
+    return wn_topic
 
 def hLDA(corpus, alpha, beta, gamma, eta, ite, level,num=3):
 
@@ -192,32 +190,36 @@ def hLDA(corpus, alpha, beta, gamma, eta, ite, level,num=3):
     
     return hLDA_tree, node_num[:level]
 
-def tree_plot(hlda,num=5):
-      
-    from IPython.display import Image, display
-    import matplotlib.pyplot as plt
-    from collections import Counter
+def tree_plot(hLDA_object, num = 3, save = False):
     
-    w=hlda[0]
-    s=hlda[1]
+    from IPython.display import Image, display
+    def viewPydot(pdot):
+        plt = Image(pdot.create_png())
+        display(plt)
+
+    words,struc = hLDA_object
     graph = pydot.Dot(graph_type='graph')
-    for i in range(1,len(s)):
-        n1=s[i] # 10
-        w1=w[i]
-        start=0
-        for j in range(len(n1)):
-            val=w[i-1][j]
-            val=list(dict(Counter(val).most_common(num)).keys())
-            root='\n'.join(val)
-            n2=n1[j] #8
-            end=start+n2
-            w2=w1[start:end]
-            for k in range(n2):
-                w3=w2[k]
-                val2=list(dict(Counter(w3).most_common(num)).keys())
-                leaf='\n'.join(val2)
-                edge = pydot.Edge(root, leaf)
-                graph.add_edge(edge)
-            start=end
-    plt = Image(graph.create_png())
-    display(plt)
+    end_index = [np.insert(np.cumsum(i),0,0) for i in struc]
+    
+    for level in range(len(struc)-1):
+        leaf_word = words[level + 1]
+        leaf_struc = struc[level + 1]
+        word = words[level]
+        end_leaf_index = end_index[level+1]
+
+        def node_plot(leaf_word, leaf_struc, end_leaf_index, word):
+            for i,e in enumerate(word):
+                root = '\n'.join([x[0] for x in Counter(e).most_common(num)])
+                lf = leaf_word[end_leaf_index[i]:end_leaf_index[i+1]]  
+                for l in lf:
+                    leaf_w = '\n'.join([x[0] for x in Counter(list(l)).most_common(num)])
+                    edge = pydot.Edge(root, leaf_w)
+                    graph.add_edge(edge)
+    
+        for w in word:
+            node_plot(leaf_word, leaf_struc, end_leaf_index, word)
+    
+    if save == True:
+        graph.write_png('graph.png')
+    
+    viewPydot(graph)
